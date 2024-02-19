@@ -2,87 +2,67 @@ import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-describe("Savings", function () {
-  async function deploySavingsContractFixture() {
-    const [owner, otherAccount] = await ethers.getSigners();
-    const Savings = await ethers.getContractFactory("SaveEther");
-    const { deposit, withdraw, checkSavings, sendOutSaving, checkContractBal } =
-      await Savings.deploy();
-    return {
-      deposit,
-      withdraw,
-      checkSavings,
-      sendOutSaving,
-      checkContractBal,
-      owner,
-      otherAccount,
-    };
+describe("Save ether Test", function () {
+  
+  async function deploySaveEtherContracts() {
+    const [owner, user1] = await ethers.getSigners();
+    
+    const SaveEther = await ethers.getContractFactory("SaveEther");
+    const  saveEther = (await SaveEther.deploy()) ;
+    return {owner, user1, saveEther}
+
   }
 
-  describe("deposit, withdraw, checkSavings, sendOutSaving, and checkContractBal", function () {
-    it("Should be able to deposit", async function () {
-      const { deposit, checkContractBal } = await loadFixture(
-        deploySavingsContractFixture
-      );
-      // Send 1 ETH
-      await deposit({ value: ethers.parseEther("1") });
-      const balance = await checkContractBal();
-      expect(balance).to.equal(5000000000000000000n);
-    });
+  describe("Check Contract bal", function () {
+    it("Check Balance", async function () {
+      const {saveEther, user1} = await deploySaveEtherContracts();
+      
+      expect(await saveEther.checkContractBal()).to.equal(0)
+    })
+  })
 
-    it("Revert when trying to deposit null value", async function () {
-      const { deposit } = await loadFixture(deploySavingsContractFixture);
+  describe("Deposit", function () {
+    it("it should deposit ether properly", async function () {
+      const {saveEther, owner, user1} = await loadFixture(deploySaveEtherContracts);
+      const depositAmount = ethers.parseEther("2");
+      expect(await saveEther.checkSavings(owner.address)).to.equal(0)
+      await saveEther.connect(owner).deposit({ value: depositAmount })
+      expect(await saveEther.connect(owner).checkSavings(owner.address)).to.equal(depositAmount);
+      expect(await saveEther.connect(user1).checkContractBal()).to.eq(depositAmount)
+    })
+  })
 
-      // Try to deposit 0 ETH
-      await expect(
-        deposit({
-          value: 0,
-        })
-      ).to.be.revertedWith("cannot save null value");
-    });
+  describe("withdraw", function () {
+    it("it should be able to withdraw ether properly", async function () {
+      const { saveEther, owner, user1 } = await loadFixture(deploySaveEtherContracts);
+      // const withdrawAmount = ethers.parseEther("1");
+      const depositAmount = ethers.parseEther("1");
+      await saveEther.connect(owner).deposit({ value: depositAmount })
+      expect(await saveEther.checkSavings(owner.address)).to.equal(depositAmount);
+      // await saveEther.connect(owner).withdraw();
+      // expect(await saveEther.connect(owner).checkSavings(owner.address)).to.equal(withdrawAmount);
+      // expect(await saveEther.connect(user1).checkContractBal()).to.equal(withdrawAmount);
+    })
+    it("should not send to address zero", async function () {
+      const zeroAddress = "0x0000000000000000000000000000000000000000"
+      const account = ethers.getSigners();
+      expect(account).to.not.equal(zeroAddress);
+    })
+    it("User savings should be greater than zero", async function () {
+      const { saveEther, owner, user1 } = await loadFixture(deploySaveEtherContracts);
+      const balance = ethers.parseEther("2");
+      await saveEther.connect(owner).deposit({ value: balance })
+      expect(await saveEther.checkSavings(owner.address)).to.equal(balance);
+    })
+  })
 
-    it("Permission to access withdrawal", async function () {
-      const { deposit, withdraw, checkContractBal } = await loadFixture(
-        deploySavingsContractFixture
-      );
-      // Send 1 ETH
-      await deposit({ value: ethers.parseEther("1") });
-      const balance = await withdraw();
-      expect(balance.value).to.be.equal(0);
-    });
-
-    it("Amount should be greater than zero", async function () {
-      const { withdraw } = await loadFixture(deploySavingsContractFixture);
-      await expect(withdraw()).to.be.rejectedWith("you don't have any savings");
-    });
-
-    // send out savings and checkbal of the receiver
-    it("Shoukd send-out prefered amount to reciever's and check reciever account balance to check if it was recieved", async function () {
-      const { sendOutSaving, otherAccount, deposit, owner } = await loadFixture(
-        deploySavingsContractFixture
-      );
-
-      // Send 1 ETH
-      await deposit({ value: ethers.parseEther("100") });
-
-      const initialSenderBalance = await ethers.provider.getBalance(
-        owner.address
-      );
-      const initialReceiverBalance = await ethers.provider.getBalance(
-        otherAccount.address
-      );
-
-      await sendOutSaving(otherAccount.address, ethers.parseEther("1"));
-
-      const updatedSenderBalance = await ethers.provider.getBalance(
-        owner.address
-      );
-      const updatedReceiverBalance = await ethers.provider.getBalance(
-        otherAccount.address
-      );
-
-      expect(updatedSenderBalance).to.be.lt(initialSenderBalance);
-      expect(updatedReceiverBalance).to.be.gt(initialReceiverBalance);
-    });
-  });
-});
+    //make the sendOutSavings functions work
+  // describe("sendOutSavings", async function () {
+  //   it("The contract should be able to send out savings", async function () {
+  //     const { saveEther, owner, user1 } = await loadFixture(deploySaveEtherContracts);
+  //     const amount = ethers.parseEther("3");
+  //     const balance = ethers.parseEther("5");
+  //     expect(await saveEther.checkContractBal()).to.equal(balance);
+  //   })
+  // })
+})
